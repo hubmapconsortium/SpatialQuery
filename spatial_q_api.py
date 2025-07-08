@@ -29,16 +29,51 @@ spatial_query_objects = {}
 # PROCESSED_FOLDER = "/tmp/spatial_objs"
 # os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
-# save in memory for now, can save to disk or S3 later
-@app.route('/api/upload_h5ad', methods=['POST'])
-def upload_h5ad():
-    file = request.files.get('file')
-    dataset_id = request.form.get('dataset_id')
+# # save in memory for now, can save to disk or S3 later
+# @app.route('/api/upload_h5ad', methods=['POST'])
+# def upload_h5ad():
+#     file = request.files.get('file')
+#     dataset_id = request.form.get('dataset_id')
 
-    if not file:
-        return jsonify({"error": "Missing file"}), 400
-    if not dataset_id:
-        return jsonify({"error": "Missing dataset_id"}), 400
+#     if not file:
+#         return jsonify({"error": "Missing file"}), 400
+#     if not dataset_id:
+#         return jsonify({"error": "Missing dataset_id"}), 400
+
+#     if dataset_id in spatial_query_objects:
+#         return jsonify({
+#             "message": f"Dataset '{dataset_id}' already exists. Skipping upload.",
+#             "dataset_id": dataset_id,
+#             "skipped": True
+#         })
+
+#     try:
+#         adata = ad.read_h5ad(file)
+#         spatial_obj = spatial_query(adata=adata)
+#         spatial_query_objects[dataset_id] = spatial_obj
+
+#         return jsonify({
+#             "message": f"Dataset '{dataset_id}' uploaded successfully.",
+#             "dataset_id": dataset_id,
+#             "skipped": False
+#         })
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/upload_spatial', methods=['POST'])
+def upload_spatial():
+    data = request.get_json()
+
+    spatial_pos = data.get("spatial_pos")
+    labels = data.get("labels")
+    dataset_id = data.get("dataset_id")
+    leaf_size = data.get("leaf_size", 10)
+    max_radius = data.get("max_radius", 500)
+    n_split = data.get("n_split", 10)
+
+    if spatial_pos is None or labels is None or dataset_id is None:
+        return jsonify({"error": "Missing spatial_pos, labels, or dataset_id"}), 400
 
     if dataset_id in spatial_query_objects:
         return jsonify({
@@ -48,12 +83,18 @@ def upload_h5ad():
         })
 
     try:
-        adata = ad.read_h5ad(file)
-        spatial_obj = spatial_query(adata=adata)
+        spatial_obj = spatial_query(
+            spatial_pos=np.array(spatial_pos),
+            dataset=dataset_id,
+            labels=labels,
+            leaf_size=leaf_size,
+            max_radius=max_radius,
+            n_split=n_split
+        )
         spatial_query_objects[dataset_id] = spatial_obj
 
         return jsonify({
-            "message": f"Dataset '{dataset_id}' uploaded successfully.",
+            "message": f"Dataset '{dataset_id}' initialized from spatial data.",
             "dataset_id": dataset_id,
             "skipped": False
         })
